@@ -7,6 +7,7 @@ Client placement strategies based on Fine Grained Routing
 """
 
 import argparse
+import random
 import re
 import logging
 import time
@@ -17,7 +18,8 @@ from collections import defaultdict
 
 # Globals
 
-ARGS = None
+ARGS   = None
+logger = None
 
 rtrA = ["c7-2c2s0", "c23-2c1s7", "c10-2c0s0", "c3-6c0s2", "c19-6c2s2", "c14-6c1s5",
         "c7-5c2s5", "c23-5c1s2", "c10-5c0s5", "c3-1c1s4", "c19-1c0s3", "c14-1c2s3" ]
@@ -171,7 +173,7 @@ def parse_args():
     placement_parser.add_argument("--numranks", type=int, default=1008, help="num of ranks")
     placement_parser.add_argument("--partition", choices=['atlas1', 'atlas2', 'atlas'],
                                   default='atlas2', help="Select partition type")
-    placement_parser.add_argument("--type", choices=["default", "hybrid"], default="hybrid", help="Placement type")
+    placement_parser.add_argument("--strategy", choices=["random", "hybrid"], default="hybrid", help="Placement type")
     placement_parser.set_defaults(func=main_placement)
 
     myargs = parser.parse_args()
@@ -369,29 +371,39 @@ def current_opath(rtr, ts):
     else:
         return "/lustre/%s/test/%s/%s" % (ARGS.partition, ARGS.username, ts)
 
-def gen_shell(ofile):
+
+def gen_lfs_setstripe(fh, ts):
+    """
+    @param fh: an open file handle
+    @param ts: timestamp
+    """
+    clients = []
+    for idx, entry in enumerate(G.SELECTED_CLIENTS[:ARGS.numranks]):
+        fname = "file." + string.rjust(str(idx), 8, "0")
+        client, ost, cost, lnet, rtr = entry
+        ost = ost % 1008
+        opath_mkdir = current_opath(rtr, ts)
+        clients.append(str(client))
+        fh.write("lfs setstripe -c 1 -i %s %s/%s\n"  % (ost, opath_mkdir, fname))
+
+    return clients
+
+def gen_shell(ofile, clients = None):
     logger.info("Writing out %s", ofile)
     ts = timestamp()
     opath_ior = None  # path for IOR command -o
-    opath_mkdir = None # path for lfs setstripe
 
     if ARGS.partition != "atlas":
-        opath_ior = "%s/file" % opath_mkdir
+        opath_ior = "/lustre/%s/test/%s/%s/file" % (ARGS.partition, ARGS.username, ts)
     else:
         opath_ior = "/lustre/atlas1/test/%s/%s/file@/lustre/atlas2/test/%s/%s/file" % \
             (ARGS.username, ts, ARGS.username, ts)
 
-    clients = []
-
     with open(ofile, "w") as f:
         f.write("#!/bin/bash\n")
-        for idx, entry in enumerate(G.SELECTED_CLIENTS[:ARGS.numranks]):
-            fname = "file." + string.rjust(str(idx), 8, "0")
-            client, ost, cost, lnet, rtr = entry
-            ost = ost % 1008
-            opath_mkdir = current_opath(rtr, ts)
-            clients.append(str(client))
-            f.write("lfs setstripe -c 1 -i %s %s/%s\n"  % (ost, opath_mkdir, fname))
+        if ARGS.strategy == "hybrid":
+            clients = gen_lfs_setstripe(f, ts)
+
         f.write("aprun -n %s -N 1 -L %s %s -a POSIX -b 1m -e -E -F -i 1 -k -t 32g -vvv -w -D 30 -o %s\n"
                 % (ARGS.numranks, ",".join(clients), ARGS.iorbin, opath_ior))
         f.close()
@@ -408,8 +420,14 @@ def gen_rtr2lnet():
             G.RTR2LNET[rtr + 'n1'] = LNET_BASE + 9 * 2 + step
             G.RTR2LNET[rtr + 'n3'] = LNET_BASE + 9 * 3 + step
 
-def main_placement():
-    fgr_prepare()
+
+def placement_random():
+    random.seed()   # system time as seeds
+    clients = map(str, random.sample(G.CLIENTS, ARGS.numranks))
+    ofile = "%s_%s_%s.sh" % (ARGS.partition, ARGS.strategy, ARGS.numranks)
+    gen_shell(ofile, clients)
+
+def placement_hybrid():
     if ARGS.partition == "atlas1":
         select_client_hybrid(G.ATLAS1_RTRS, ARGS.numranks)
     elif ARGS.partition == "atlas2":
@@ -421,10 +439,19 @@ def main_placement():
         sys.exit(1)
 
     # client selection is done
-    gen_shell("%s_%s.sh" % (ARGS.partition, ARGS.numranks))
+    gen_shell("%s_%s_%s.sh" % (ARGS.partition, ARGS.strategy, ARGS.numranks))
 
     # debug output
     debug_hybrid("%s_%s.debug" % (ARGS.partition, ARGS.numranks))
+
+def main_placement():
+    fgr_prepare()
+    if ARGS.strategy == "hybrid":
+        placement_hybrid()
+    elif ARGS.strategy == "random":
+        placement_random()
+    else:
+        raise "Shouldn't happen"
 
 def setup_logging(loglevel):
     global logger
