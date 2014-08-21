@@ -1,0 +1,6 @@
+*.map
+.ropeproject
+*.debug
+*.sh
+*.log
+
