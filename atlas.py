@@ -29,6 +29,10 @@ class OSS:
         self.o2ib = o2ib
         self.localosts = localosts
 
+    def __str__(self):
+        return "name:%s, fs:%s, row:%s, ddn:%s, oss:%s, switch:%s, obib:%s,  localosts:%s" \
+            % (self.name, self.fs, self.row, self.ddn, self.oss, self.switch, self.o2ib,  self.localosts)
+
 class OST:
     def __init__(self, ost, name, fs, row, ddn, oss, switch, ip, o2ib, ossostidx):
         self.ost = ost
@@ -85,8 +89,7 @@ def read_from_disk():
                 # on-disk ost index for atlas2 starts from 1008
                 G.LNET2OST2[lnet] = [x % 1008 for x in map(int, line[1:])]
 
-def main():
-    create_atlas()
+def verify():
     try:
         read_from_disk()
     except IOError, e:
@@ -106,6 +109,16 @@ def main():
             print("\t %s\n" % G.LNET2OST1[lnet])
             print("\t %s\n" % G.LNET2OST2[lnet])
             sys.exit(1)
+
+
+def main():
+    create_atlas()
+
+    if len(sys.argv) > 1 and sys.argv[1] == "verify":
+        verify()
+
+    for oss in G.OSS_LIST:
+        print oss
 
 if __name__ == "__main__": main()
 
