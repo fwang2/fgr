@@ -110,7 +110,6 @@ class Node:
     def name(self):
         return self.__str__()
 
-
 class Router:
     def __init__(self, nid, cname, interface, x, y, z):
         self.nid = nid
@@ -151,7 +150,6 @@ def str2node(s):
     g = res.groups()
     return Node(g[0], g[1], g[2], g[3], g[4])
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description="FGR Program")
 
@@ -179,7 +177,6 @@ def parse_args():
 
     myargs = parser.parse_args()
     return myargs
-
 
 def dist(v1, v2, dim):
     if v1 == v2: return 0
@@ -413,13 +410,21 @@ def gen_shell(ofile, clients = None):
 
     with open(ofile, "w") as f:
         f.write("#!/bin/bash\n")
+        f.write("#PBS -N ior-%s-placement\n" % ARGS.partition)
+        f.write("#PBS -j oe\n")
+        f.write("#PBS -q batch\n")
+        f.write("#PBS -V\n")
+        f.write("#PBS -A STF008\n")
+        f.write("#PBS -l walltime=01:00:00\n")
+        f.write("#PBS -l nodes=18688\n")
+        f.write('[[ "$PBS_JOBID" ]] || PBS_JOBID=$(date +%s)\n')
+        f.write('[[ "$PBS_O_WORKDIR" ]] && cd $PBS_O_WORKDIR\n')
         if ARGS.strategy == "hybrid":
             clients = gen_lfs_setstripe(f, ts)
 
         f.write("aprun -n %s -N 1 -L %s %s -a POSIX -b 1m -e -E -F -i 1 -k -t 32g -vvv -w -D 30 -o %s\n"
                 % (ARGS.numranks, ",".join(clients), ARGS.iorbin, opath_ior))
         f.close()
-
 
 def gen_rtr2lnet():
     global rtrALL
