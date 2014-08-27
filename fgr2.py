@@ -162,6 +162,7 @@ def parse_args():
     parent_parser.add_argument("--username", default="fwang2", help="Provide user name")
     parent_parser.add_argument("--iorbin", default="/lustre/atlas2/test/fwang2/bio/ior-test/IOR.posix", help="IOR bin")
     parent_parser.add_argument("--fgrfile", default="routing.map", help="Routing map")
+    parent_parser.add_argument("--nodefile",  help="Node list")
     subparsers = parser.add_subparsers(help="Provide one of the sub-commands")
 
 
@@ -208,6 +209,16 @@ def fgr_prepare():
             G.NID2X[nid], G.NID2Y[nid], G.NID2Z[nid] = x, y, z
 
             create_rtr_list(cname, nid, x, y, z)
+
+    if ARGS.nodefile:
+        try:
+            with open(ARGS.nodefile, "r") as f:
+                for line in f:
+                    nid = int(line.strip())
+                    G.CLIENTS.append(nid)
+        except IOError, e:
+            print("Read %s error: \n %s" % (ARGS.nodefile, e))
+            sys.exit(1)
 
 
     if ARGS.failed:
