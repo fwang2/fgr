@@ -158,7 +158,7 @@ def parse_args():
     parent_parser.add_argument("--failed", type=int, nargs="+", help="A list of failed computes")
     parent_parser.add_argument("--map", default="titan.map", help="Titan map filename")
     parent_parser.add_argument("--username", default="fwang2", help="Provide user name")
-    parent_parser.add_argument("--iorbin", default="/lustre/atlas2/test/fwang2/bio/ior-test/IOR.posix", help="IOR bin")
+    parent_parser.add_argument("--iorbin", default="/lustre/atlas2/test/fwang2/iotests/ior-test/IOR.posix", help="IOR bin")
     parent_parser.add_argument("--fgrfile", default="routing.map", help="Routing map")
     parent_parser.add_argument("--nodefile",  help="Node list")
     subparsers = parser.add_subparsers(help="Provide one of the sub-commands")
