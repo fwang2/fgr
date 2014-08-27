@@ -211,6 +211,7 @@ def fgr_prepare():
             create_rtr_list(cname, nid, x, y, z)
 
     if ARGS.nodefile:
+        G.CLIENTS = []
         try:
             with open(ARGS.nodefile, "r") as f:
                 for line in f:
