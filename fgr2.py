@@ -346,6 +346,11 @@ def select_client_hybrid(rtrs, numranks):
 
     logger.info("Selected clients: %s", len(G.SELECTED_CLIENTS))
 
+    # check for duplicate
+    import collections
+    logger.info("Check duplicates: %s",
+                [x for x, y in collections.Counter(G.SELECTED_CLIENTS).items() if y > 1])
+
 def timestamp():
     ts = time.time()
     return datetime.fromtimestamp(ts).strftime('%Y-%m-%d.%H%M%S')
@@ -462,7 +467,7 @@ def placement_hybrid():
     elif ARGS.partition == "atlas2":
         select_client_hybrid(G.ATLAS2_RTRS, ARGS.numranks)
     elif ARGS.partition == "atlas":
-        select_client_hybrid(G.ATLAS1_RTRS + G.ATLAS2_RTRS, ARGS.numranks)
+        select_client_hybrid(G.ATLAS1_RTRS + G.ATLAS2_RTRS, ARGS.numranks * 2)
     else:
         logger.critical("Unknown partition: %s", ARGS.partition)
         sys.exit(1)
