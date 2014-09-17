@@ -89,6 +89,9 @@ class G:
     # each tuple is (client, ost, rtr, lnet, cost)
     SELECTED_CLIENTS = []
 
+    # client ID only, for check of duplicate
+    SELECTED_CLIENT_IDS = []
+
     ####### LNETS
 
     LNET2OST = defaultdict(list) # lnet -> list of OSTs
@@ -325,11 +328,12 @@ def best_client(rtr):
     while True:
         client = G.RTR_CLIENTS[rtr_nid][0]
         G.RTR_CLIENTS[rtr_nid].pop(0)
-        if client in G.SELECTED_CLIENTS:
+        if client in G.SELECTED_CLIENT_IDS:
             continue
         else:
             break
 
+    G.SELECTED_CLIENT_IDS.append(client)
     return client, G.CLIENT_COSTS[client][rtr_nid]
 
 def select_client_hybrid(rtrs, numranks):
@@ -349,7 +353,7 @@ def select_client_hybrid(rtrs, numranks):
     # check for duplicate
     import collections
     logger.info("Check duplicates: %s",
-                [x for x, y in collections.Counter(G.SELECTED_CLIENTS).items() if y > 1])
+              [x for x, y in collections.Counter(G.SELECTED_CLIENT_IDS).items() if y > 1])
 
 def timestamp():
     ts = time.time()
@@ -467,7 +471,7 @@ def placement_hybrid():
     elif ARGS.partition == "atlas2":
         select_client_hybrid(G.ATLAS2_RTRS, ARGS.numranks)
     elif ARGS.partition == "atlas":
-        select_client_hybrid(G.ATLAS1_RTRS + G.ATLAS2_RTRS, ARGS.numranks * 2)
+        select_client_hybrid(G.ATLAS1_RTRS + G.ATLAS2_RTRS, ARGS.numranks)
     else:
         logger.critical("Unknown partition: %s", ARGS.partition)
         sys.exit(1)
