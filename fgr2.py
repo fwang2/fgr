@@ -419,10 +419,22 @@ def gen_shell(ofile, clients = None):
         f.write("#PBS -l nodes=18688\n")
         f.write('[[ "$PBS_JOBID" ]] || PBS_JOBID=$(date +%s)\n')
         f.write('[[ "$PBS_O_WORKDIR" ]] && cd $PBS_O_WORKDIR\n')
+        if ARGS.partition != "atlas":
+            iopath = "/lustre/%s/test/%s/%s" % (ARGS.partition, ARGS.username, ts)
+            f.write("rm -rf %s\n" % iopath)
+            f.write("mkdir -p %s\n" % iopath)
+        else:
+            iopath1 = "/lustre/atlas1/test/%s/%s" % (ARGS.username, ts)
+            iopath2 = "/lustre/atlas2/test/%s/%s" % (ARGS.username, ts)
+            f.write("rm -rf %s\n" % iopath1)
+            f.write("rm -rf %s\n" % iopath2)
+            f.write("mkdir -p %s\n" % iopath1)
+            f.write("mkdir -p %s\n" % iopath2)
+
         if ARGS.strategy == "hybrid":
             clients = gen_lfs_setstripe(f, ts)
 
-        f.write("aprun -n %s -N 1 -L %s %s -a POSIX -b 1m -e -E -F -i 1 -k -t 32g -vvv -w -D 30 -o %s\n"
+        f.write("aprun -n %s -N 1 -L %s %s -a POSIX -b 32g -e -E -F -i 1 -k -t 1m -vv -w -D 30 -o %s\n"
                 % (ARGS.numranks, ",".join(clients), ARGS.iorbin, opath_ior))
         f.close()
 
