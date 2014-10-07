@@ -22,11 +22,6 @@ that aims to provide the context/debug information on why the chosen node.
 
 ## Perform the test
 
-Since the shell script is generated with full path specified, you should be
-able to run it anywhere on Cray login. That said, the default path and user
-name will have to match *you*: this can be specified through `--username`
-option.
-
-
+    $ cd /path/to/lustre/partititon
     $ atlas2_hybrid_1008.sh | tee atals2_hybrid_1008.log
 

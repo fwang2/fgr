@@ -443,7 +443,7 @@ def gen_shell(ofile, clients = None):
         if ARGS.strategy == "hybrid":
             clients = gen_lfs_setstripe(f, ts)
 
-        f.write("aprun -n %s -N 1 -L %s %s -a POSIX -b 32g -e -E -F -i 1 -k -t 1m -vv -w -D 30 -o %s\n"
+        f.write("aprun -n %s -N 1 -L %s %s -a POSIX -b 32g -e -E -F -i 1 -k -t 1m -vv -w -D 20 -o %s\n"
                 % (ARGS.numranks, ",".join(clients), ARGS.iorbin, opath_ior))
         f.close()
 
