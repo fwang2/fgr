@@ -13,6 +13,7 @@ import logging
 import time
 import string
 import sys
+import os
 from datetime import datetime
 from collections import defaultdict
 
@@ -176,6 +177,7 @@ def parse_args():
     placement_parser.add_argument("--partition", choices=['atlas1', 'atlas2', 'atlas'],
                                   default='atlas2', help="Select partition type")
     placement_parser.add_argument("--strategy", choices=["random", "hybrid"], default="hybrid", help="Placement type")
+    placement_parser.add_argument("--stripesize", default="1M", help="Set Lustre stripe size, default 1M")
     placement_parser.set_defaults(func=main_placement)
 
     myargs = parser.parse_args()
@@ -402,7 +404,7 @@ def gen_lfs_setstripe(fh, ts):
         ost = ost % 1008
         opath_mkdir = current_opath(rtr, ts)
         clients.append(str(client))
-        fh.write("lfs setstripe -c 1 -i %s %s/%s\n"  % (ost, opath_mkdir, fname))
+        fh.write("lfs setstripe -s %s -c 1 -i %s %s/%s\n"  % (ARGS.stripesize, ost, opath_mkdir, fname))
 
     return clients
 
@@ -446,6 +448,8 @@ def gen_shell(ofile, clients = None):
         f.write("aprun -n %s -N 1 -L %s %s -a POSIX -b 32g -e -E -F -i 1 -k -t 1m -vv -w -D 20 -o %s\n"
                 % (ARGS.numranks, ",".join(clients), ARGS.iorbin, opath_ior))
         f.close()
+    # set file permission
+    os.chmod(ofile, 0744)
 
 def gen_rtr2lnet():
     global rtrALL
@@ -459,11 +463,15 @@ def gen_rtr2lnet():
             G.RTR2LNET[rtr + 'n3'] = LNET_BASE + 9 * 3 + step
 
 
+
+def gen_ofile_name():
+
+    return "%s_%s_%s_%s.sh" % (ARGS.partition, ARGS.strategy, ARGS.numranks, ARGS.stripesize)
+
 def placement_random():
     random.seed()   # system time as seeds
     clients = map(str, random.sample(G.CLIENTS, ARGS.numranks))
-    ofile = "%s_%s_%s.sh" % (ARGS.partition, ARGS.strategy, ARGS.numranks)
-    gen_shell(ofile, clients)
+    gen_shell(gen_ofile_name(), clients)
 
 def placement_hybrid():
     if ARGS.partition == "atlas1":
@@ -477,7 +485,7 @@ def placement_hybrid():
         sys.exit(1)
 
     # client selection is done
-    gen_shell("%s_%s_%s.sh" % (ARGS.partition, ARGS.strategy, ARGS.numranks))
+    gen_shell(gen_ofile_name())
 
     # debug output
     debug_hybrid("%s_%s.debug" % (ARGS.partition, ARGS.numranks))
