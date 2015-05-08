@@ -160,7 +160,7 @@ import os
 import cPickle as pickle
 import subprocess
 import operator
-
+import multiprocessing
 
 from datetime import datetime
 from collections import defaultdict
@@ -426,6 +426,14 @@ def parse_args():
     nidinfo_parser.set_defaults(func=main_nidinfo)
 
 
+    rtgens_parser = subparsers.add_parser("rtgens",parents=[parent_parser], help="Generate FGR routing map (serial)")
+    rtgens_parser.set_defaults(func=main_rtgens)
+
+
+    rtgenp_parser = subparsers.add_parser("rtgenp", parents=[parent_parser], help="Generate FGR routing map (parallel)")
+    rtgenp_parser.set_defaults(func=main_rtgenp)
+
+
     myargs = parser.parse_args()
     return myargs
 
@@ -455,11 +463,33 @@ def create_rtr_list(cname, nid, x, y, z):
         r = Router(nid, candidate, interface, x, y, z)
         G.RID2ROUTER[nid] = r
 
-def fgr_prepare():
-    """
-    pre-processing
-    """
 
+def do_fgrfile():
+    with open(ARGS.fgrfile, "r") as f:
+        for line in f:
+            entry = line.split()
+            nid = int(entry[0])
+            if nid not in G.CLIENTS: continue
+            rtrlist = entry[1:]
+            for ele in rtrlist:
+                # ele takes the form of o2ib201:17736
+                # ele[4:] will cut away o2ib, with 201:17736 left
+                # we split and convert it to integer value
+                lnet, rtr = [int(i) for i in ele[4:].split(":")]
+                # G.ROUTERS.add(rtr)
+                # if rtr not in G.LNET_ROUTERS[lnet]:
+                #    G.LNET_ROUTERS[lnet].append(rtr)
+
+                cost = 4 * dist(G.NID2X[nid], G.NID2X[rtr], 25)
+                cost += 8 * dist(G.NID2Y[nid], G.NID2Y[rtr], 16)
+                cost += dist(G.NID2Z[nid], G.NID2Z[rtr], 24)
+                cost += 100  # TODO: for verification only
+
+                G.ROUTER_COSTS[rtr][cost].append(nid)
+                G.CLIENT_COSTS[nid][rtr] = cost
+
+
+def do_mapfile():
     with open(ARGS.map, "r") as f:
         for line in f:
             nid, cname, nodetype, x, y, z = line.split()
@@ -473,6 +503,8 @@ def fgr_prepare():
 
             create_rtr_list(cname, nid, x, y, z)
 
+
+def do_nodefile():
     if ARGS.nodefile:
         G.CLIENTS = []
         try:
@@ -485,34 +517,23 @@ def fgr_prepare():
             sys.exit(1)
 
 
+def fgr_prepare(skip_fgr_file=False):
+    """
+    pre-processing
+    """
+
+    do_mapfile()
+
+    do_nodefile()
+
+
     if ARGS.failed:
         G.CLIENTS = list(set(G.CLIENTS) - set(ARGS.failed))
 
     logger.info("G.CLIENTS contains [%s] nids", len(G.CLIENTS))
 
-
-    with open(ARGS.fgrfile, "r") as f:
-        for line in f:
-            entry = line.split()
-            nid = int(entry[0])
-            if nid not in G.CLIENTS: continue
-            rtrlist = entry[1:]
-            for ele in rtrlist:
-                # ele takes the form of o2ib201:17736
-                # ele[4:] will cut away o2ib, with 201:17736 left
-                # we split and convert it to integer value
-                lnet, rtr = [ int(i) for i in ele[4:].split(":")]
-                # G.ROUTERS.add(rtr)
-                #if rtr not in G.LNET_ROUTERS[lnet]:
-                #    G.LNET_ROUTERS[lnet].append(rtr)
-
-                cost = 4 * dist(G.NID2X[nid], G.NID2X[rtr], 25)
-                cost += 8 * dist(G.NID2Y[nid], G.NID2Y[rtr], 16)
-                cost += dist(G.NID2Z[nid], G.NID2Z[rtr], 24)
-                cost += 100 # TODO: for verification only
-
-                G.ROUTER_COSTS[rtr][cost].append(nid)
-                G.CLIENT_COSTS[nid][rtr] = cost
+    if not skip_fgr_file:
+        do_fgrfile()
 
 
     for ost in range(1008):
@@ -982,6 +1003,69 @@ def dump_routes():
     for key in G.LNET2NID.keys():
         print "o2ib%s:%s:gni%s" % (key, G.LNET2NID[key], G.LNET2GNI[key])
 
+
+
+
+def record_routes(nid, f):
+    f.write("%s " % nid)
+    lnets = ["o2ib%s:%s" % (key, G.LNET2NID[key]) for key in G.LNET2NID.keys() ]
+    f.write(" ".join(lnets))
+    f.write("\n")
+
+
+def main_rtgens():
+    """
+    serialized version
+    TODO: still don't think G.CNAME is needed
+    """
+    fgr_prepare(skip_fgr_file=True)
+    logger.info("Generating FGRFILE")
+    f = open(ARGS.fgrfile, "w")
+    for col in range(25):
+        logger.info("\tprocessing %s of 25 columns", col+1)
+        for row in range(8):
+            for cage in range(3):
+                for slot in range(8):
+                    for n in range(4):
+                        G.CNAME = "c%s-%sc%ss%sn%s" % (col, row, cage, slot, n)
+                        gen_routes(G.CNAME)
+                        record_routes(nid(G.CNAME), f)
+    f.close()
+
+
+def gen_routes_worker(row):
+    name = multiprocessing.current_process().name
+    logger.info("%s generating FGRFILE for row %s", name, row)
+    fgr_partial = "%s.%02d" % (ARGS.fgrfile, row)
+    f = open(fgr_partial, "w")
+    for col in range(25):
+        for cage in range(3):
+            for slot in range(8):
+                for n in range(4):
+                    G.CNAME = "c%s-%sc%ss%sn%s" % (col, row, cage, slot, n)
+                    G.CNODE = str2node(G.CNAME)
+                    gen_routes(G.CNODE)
+                    record_routes(f)
+        percent = (col + 1) * 4
+        logger.info("Worker %s: %d%% done", name, percent)
+    f.close()
+    logger.info("Finish generating routes for row %s", row)
+
+
+def main_rtgenp():
+    """using multiprocessing"""
+    fgr_prepare(skip_fgr_file=True)
+    jobs = []
+    for i in range(8):
+        p = multiprocessing.Process(target=gen_routes_worker, args=(i,))
+        jobs.append(p)
+        p.start()
+
+    for job in jobs:
+        job.join()
+
+    logger.info("All jobs are finished, cats all output into a single one")
+
 def main_nidinfo():
     """
     Given a NID, explore options
@@ -993,7 +1077,7 @@ def main_nidinfo():
     if not nid in G.CLIENTS:
         print("%s is not a compute node!" % nid)
         sys.exit(1)
-        
+
     print("\nNID = %s, cname = %s, (%s, %s, %s)" %
           (nid, G.NID2CNAME[nid], G.NID2X[nid], G.NID2Y[nid], G.NID2Z[nid]))
 
