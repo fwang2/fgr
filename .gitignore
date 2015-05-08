@@ -3,4 +3,6 @@
 *.debug
 *.sh
 *.log
+*.ps
+.idea
 
