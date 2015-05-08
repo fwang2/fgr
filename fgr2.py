@@ -73,6 +73,9 @@ Usage
     Expect both to return "OKAY", and I don't expect this test
     needs to be done except debugging
 
+(6) Re-generate FGR routing table (serial)
+
+    ./fgr2.py rtgens --fgrfile test.map
 
 Titan Physical layout
 =====================
@@ -517,15 +520,15 @@ def do_nodefile():
             sys.exit(1)
 
 
-def fgr_prepare(skip_fgr_file=False):
+def fgr_prepare(skip_node_file=False, skip_fgr_file=False):
     """
     pre-processing
     """
 
     do_mapfile()
 
-    do_nodefile()
-
+    if not skip_node_file:
+        do_nodefile()
 
     if ARGS.failed:
         G.CLIENTS = list(set(G.CLIENTS) - set(ARGS.failed))
@@ -590,6 +593,10 @@ def main_mapinfo():
     logger.info("Generating client 2 router cost:")
     with open("client2rtr.cost", "w") as f:
         pickle.dump(G.CLIENT_COSTS, f, pickle.HIGHEST_PROTOCOL)
+
+    logger.info("Generating client routint table")
+    with open("client2rtr.csv, "w"") as f:
+        pass
 
 def best_client(rtr):
     """
