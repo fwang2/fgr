@@ -833,8 +833,7 @@ def select_grp(cname, rtrList):
 
 def select_route(cname, lnet, rtrgrp):
     """
-
-    node - a cname
+    lnet = (201 - 209)
 
     Once a sub-group (3 router modules)'s primary router module
     are picked for the this LNET, 3 other <LNET, ROUTER> mapping are also decided.
@@ -963,13 +962,23 @@ def gen_routes(cname):
 
     ./node-list-routes.sh c0-0c1s5n0
 
+
+    we call select_route() on each lnet ranging from 201 to 209.
+    Each select_route will actually fill 4 mapping of <lnet, router ID>
+
+    the 3rd parameter of select_route() is a router group from rtrALL
+    rtrALL[0] - rtr group A
+    rtrAll[1] - rtr group B
+    ...
+    each router group has 12 router modules
+
+    So essentially we are passing in:
+
+
     201, rtr group A
     202, rtr group B
     ...
     210, rtr group I
-
-    we call select_route() on each lnet ranging from 201 to 209.
-    Each select_route will actually fill 4 mapping of <lnet, router ID>
 
     So after this, we will fill into all 4 * 9 = 36 LNET mapping with their
     primary router selection.
@@ -1110,7 +1119,7 @@ def main_debugclient():
     except:
         print("Can't import numpy package, please install")
         sys.exit(1)
-        
+
     fgr_prepare()
     all_client_costs = []
     per_client_costs = []
