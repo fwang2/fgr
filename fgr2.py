@@ -1102,6 +1102,9 @@ def main_nidinfo():
     dump_routes()
 
 def main_debugclient():
+    """
+    compute client to router cost in FGRFILE
+    """
     fgr_prepare()
     all_client_costs = []
     per_client_costs = []
