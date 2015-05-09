@@ -251,7 +251,11 @@ class G:
     # client_nid -> router nid -> cost
     # = defaultdict(lambda: defaultdict(int))
     # would be more clear, but can't pickle it
-    CLIENT_COSTS = defaultdict(dd_int)
+    CLI2COSTS = defaultdict(dd_int)
+
+    # client_nid -> lnet -> router nid
+    # this is populated with do_fgrfile
+    CLI2RTID = defaultdict(dd_int)
 
     # each router, each cost, the clients
     # {rtr_id as key -> {cost -> [ ... clients ...]}
@@ -437,6 +441,9 @@ def parse_args():
     rtgenp_parser.set_defaults(func=main_rtgenp)
 
 
+    debugclient_parser = subparsers.add_parser("debugclient", parents=[parent_parser], help="Debug client")
+    debugclient_parser.set_defaults(func=main_debugclient)
+
     myargs = parser.parse_args()
     return myargs
 
@@ -489,7 +496,8 @@ def do_fgrfile():
                 cost += 100  # TODO: for verification only
 
                 G.ROUTER_COSTS[rtr][cost].append(nid)
-                G.CLIENT_COSTS[nid][rtr] = cost
+                G.CLI2COSTS[nid][rtr] = cost
+                G.CLI2RTID[nid][lnet] = rtr
 
 
 def do_mapfile():
@@ -592,10 +600,10 @@ def main_mapinfo():
 
     logger.info("Generating client 2 router cost:")
     with open("client2rtr.cost", "w") as f:
-        pickle.dump(G.CLIENT_COSTS, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(G.CLI2COSTS, f, pickle.HIGHEST_PROTOCOL)
 
     logger.info("Generating client routint table")
-    with open("client2rtr.csv, "w"") as f:
+    with open("client2rtr.csv", "w") as f:
         pass
 
 def best_client(rtr):
@@ -616,7 +624,7 @@ def best_client(rtr):
             break
 
     G.SELECTED_CLIENT_IDS.append(client)
-    return client, G.CLIENT_COSTS[client][rtr_nid]
+    return client, G.CLI2COSTS[client][rtr_nid]
 
 def select_client_hybrid(rtrs, numranks):
     # build up a list of all eligible OSTs
@@ -657,7 +665,7 @@ def debug_hybrid(ofile):
             f.write("Router %s: (%s, %s, %s)\n" % (rtr, rtrobj.x, rtrobj.y, rtrobj.z))
             for c in clients:
                 f.write("\t Client: %s: (%s, %s, %s), cost=%s\n"
-                        %(c, G.NID2X[c], G.NID2Y[c], G.NID2Z[c], G.CLIENT_COSTS[c][rtr]))
+                        %(c, G.NID2X[c], G.NID2Y[c], G.NID2Z[c], G.CLI2COSTS[c][rtr]))
         f.close()
 
 def current_opath(rtr, ts):
@@ -1092,6 +1100,25 @@ def main_nidinfo():
     print("\nRouting Table for: %s\n" % nid)
     gen_routes(G.NID2CNAME[nid])
     dump_routes()
+
+def main_debugclient():
+    fgr_prepare()
+    all_client_costs = []
+    per_client_costs = []
+    for nid in G.CLIENTS:
+        tally = 0
+        for lnet in range(201,237):
+            rid = G.CLI2RTID[nid][lnet]
+            all_client_costs.append(G.CLI2COSTS[nid][rid])
+            tally += G.CLI2COSTS[nid][rid]
+        per_client_costs.append(tally)
+
+    # compute avg, min, max
+    print("Per client: min = {:.2f}, max = {:.2f}, avg = {:.2f}".
+          format(min(per_client_costs), max(per_client_costs), sum(per_client_costs)/len(per_client_costs)))
+
+    print("All client: min = {:.2f}, max = {:.2f}, avg = {:.2f}".
+          format(min(all_client_costs), max(all_client_costs), sum(all_client_costs)/len(all_client_costs)))
 
 
 def setup_logging(loglevel):
