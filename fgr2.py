@@ -1105,6 +1105,12 @@ def main_debugclient():
     """
     compute client to router cost in FGRFILE
     """
+    try:
+        import numpy as np
+    except:
+        print("Can't import numpy package, please install")
+        sys.exit(1)
+        
     fgr_prepare()
     all_client_costs = []
     per_client_costs = []
@@ -1116,12 +1122,15 @@ def main_debugclient():
             tally += G.CLI2COSTS[nid][rid]
         per_client_costs.append(tally)
 
-    # compute avg, min, max
-    print("Per client: min = {:.2f}, max = {:.2f}, avg = {:.2f}".
-          format(min(per_client_costs), max(per_client_costs), sum(per_client_costs)/len(per_client_costs)))
+    x = np.array(per_client_costs)
+    y = np.array(all_client_costs)
 
-    print("All client: min = {:.2f}, max = {:.2f}, avg = {:.2f}".
-          format(min(all_client_costs), max(all_client_costs), sum(all_client_costs)/len(all_client_costs)))
+    # compute avg, min, max
+    print("Per client: min = {:.2f}, max = {:.2f}, avg = {:.2f}, std = {:.2f}".
+          format(x.min(), x.max(), x.mean(), x.std()))
+
+    print("All client: min = {:.2f}, max = {:.2f}, avg = {:.2f}, std = {:.2f}".
+          format(y.min(), y.max(), y.mean(), y.std()))
 
 
 def setup_logging(loglevel):
